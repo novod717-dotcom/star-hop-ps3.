@@ -1,0 +1,56 @@
+name: Build STAR HOP PS3
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'STARHOP_PS3.zip'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get repository files
+        uses: actions/checkout@v4
+
+      - name: Install PS3DEV toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL 'https://github.com/ps3dev/ps3toolchain/releases/latest/download/ps3dev-linux-X64.tar.gz' -o "$RUNNER_TEMP/ps3dev.tar.gz"
+          mkdir -p "$RUNNER_TEMP/ps3dev"
+          tar -xzf "$RUNNER_TEMP/ps3dev.tar.gz" -C "$RUNNER_TEMP/ps3dev"
+          echo "PS3DEV=$RUNNER_TEMP/ps3dev" >> "$GITHUB_ENV"
+          echo "PSL1GHT=$RUNNER_TEMP/ps3dev" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/ps3dev/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/ps3dev/ppu/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/ps3dev/spu/bin" >> "$GITHUB_PATH"
+
+      - name: Build SDL2 for PSL1GHT
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/sergiou87/SDL2_PSL1GHT.git "$RUNNER_TEMP/SDL2_PSL1GHT"
+          cd "$RUNNER_TEMP/SDL2_PSL1GHT"
+          chmod +x script.sh
+          ./script.sh
+          make -j2
+          make install
+
+      - name: Unpack and build the game
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -q STARHOP_PS3.zip
+          cd STARHOP_PS3
+          make pkg
+
+      - name: Save PKG and SELF as build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: STAR-HOP-PS3
+          path: |
+            STARHOP_PS3/STARHOP.pkg
+            STARHOP_PS3/STARHOP.self
+          if-no-files-found: error
